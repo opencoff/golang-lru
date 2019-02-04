@@ -3,7 +3,7 @@ package lru
 import (
 	"sync"
 
-	"github.com/hashicorp/golang-lru/simplelru"
+	"github.com/opencoff/golang-lru/simplelru"
 )
 
 // ARCCache is a thread-safe fixed size Adaptive Replacement Cache (ARC).
@@ -174,6 +174,106 @@ func (c *ARCCache) Add(key, value interface{}) {
 	// Add to the recently seen list
 	c.t1.Add(key, value)
 	return
+}
+
+// Probe returns an existing value and true if 'key' is found in the cache.
+// Otherwise, it calls ctor() to create and insert a new element, and returns
+// the newly created element. Probe returns false when the element is not found
+// in the cache (and hence had to be inserted).
+func (c *ARCCache) Probe(key interface{}, ctor func(key interface{}) interface{}) (interface{}, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// If the value is contained in T1 (recent), then
+	// promote it to T2 (frequent)
+	if val, ok := c.t1.Peek(key); ok {
+		c.t1.Remove(key)
+		c.t2.Add(key, val)
+		return val, ok
+	}
+
+	// Check if the value is contained in T2 (frequent)
+	if val, ok := c.t2.Get(key); ok {
+		return val, ok
+	}
+
+	// No hit; add to cache
+	value := ctor(key)
+
+	// Check if this value was recently evicted as part of the
+	// recently used list
+	if c.b1.Contains(key) {
+		// T1 set is too small, increase P appropriately
+		delta := 1
+		b1Len := c.b1.Len()
+		b2Len := c.b2.Len()
+		if b2Len > b1Len {
+			delta = b2Len / b1Len
+		}
+		if c.p+delta >= c.size {
+			c.p = c.size
+		} else {
+			c.p += delta
+		}
+
+		// Potentially need to make room in the cache
+		if c.t1.Len()+c.t2.Len() >= c.size {
+			c.replace(false)
+		}
+
+		// Remove from B1
+		c.b1.Remove(key)
+
+		// Add the key to the frequently used list
+		c.t2.Add(key, value)
+		return value, false
+	}
+
+	// Check if this value was recently evicted as part of the
+	// frequently used list
+	if c.b2.Contains(key) {
+		// T2 set is too small, decrease P appropriately
+		delta := 1
+		b1Len := c.b1.Len()
+		b2Len := c.b2.Len()
+		if b1Len > b2Len {
+			delta = b1Len / b2Len
+		}
+		if delta >= c.p {
+			c.p = 0
+		} else {
+			c.p -= delta
+		}
+
+		// Potentially need to make room in the cache
+		if c.t1.Len()+c.t2.Len() >= c.size {
+			c.replace(true)
+		}
+
+		// Remove from B2
+		c.b2.Remove(key)
+
+		// Add the key to the frequently used list
+		c.t2.Add(key, value)
+		return value, false
+	}
+
+	// Potentially need to make room in the cache
+	if c.t1.Len()+c.t2.Len() >= c.size {
+		c.replace(false)
+	}
+
+	// Keep the size of the ghost buffers trim
+	if c.b1.Len() > c.size-c.p {
+		c.b1.RemoveOldest()
+	}
+	if c.b2.Len() > c.p {
+		c.b2.RemoveOldest()
+	}
+
+	// Add to the recently seen list
+	c.t1.Add(key, value)
+	return value, false
 }
 
 // replace is used to adaptively evict from either T1 or T2

@@ -3,7 +3,7 @@ package lru
 import (
 	"sync"
 
-	"github.com/hashicorp/golang-lru/simplelru"
+	"github.com/opencoff/golang-lru/simplelru"
 )
 
 // Cache is a thread-safe fixed size LRU cache.
@@ -66,6 +66,23 @@ func (c *Cache) Peek(key interface{}) (value interface{}, ok bool) {
 	defer c.lock.RUnlock()
 	return c.lru.Peek(key)
 }
+
+// Probe adds 'val' if the key is NOT found in the cache and returns it.
+// If key is in the cache, the corresponding value is returned.
+// 'ok' is true is found in the cache and false otherwise.
+func (c *Cache) Probe(key, ctor func(key interface{}) interface{}) (value interface{}, ok bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	value, ok = c.lru.Get(key)
+	if !ok {
+		// No hit; add to the cache
+		value = ctor(key)
+
+		c.lru.Add(key, value)
+	}
+	return value, ok
+}
+
 
 // ContainsOrAdd checks if a key is in the cache  without updating the
 // recent-ness or deleting it for being stale,  and if not, adds the value.

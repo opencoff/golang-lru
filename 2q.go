@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hashicorp/golang-lru/simplelru"
+	"github.com/opencoff/golang-lru/simplelru"
 )
 
 const (
@@ -139,6 +139,44 @@ func (c *TwoQueueCache) Add(key, value interface{}) {
 	c.ensureSpace(false)
 	c.recent.Add(key, value)
 	return
+}
+
+// Probe adds 'val' if the key is NOT found in the cache and returns it.
+// If key is in the cache, the corresponding value is returned.
+// 'ok' is true is found in the cache and false otherwise.
+func (c *TwoQueueCache) Probe(key, ctor func(key interface{}) interface {}) (interface{}, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// Check if this is a frequent value
+	if val, ok := c.frequent.Get(key); ok {
+		return val, ok
+	}
+
+	// If the value is contained in recent, then we
+	// promote it to frequent
+	if val, ok := c.recent.Peek(key); ok {
+		c.recent.Remove(key)
+		c.frequent.Add(key, val)
+		return val, ok
+	}
+
+	// No hit; add to the cache
+	value := ctor(key)
+
+	// If the value was recently evicted, add it to the
+	// frequently used list
+	if c.recentEvict.Contains(key) {
+		c.ensureSpace(true)
+		c.recentEvict.Remove(key)
+		c.frequent.Add(key, value)
+	} else {
+		// Add to the recently seen list
+		c.ensureSpace(false)
+		c.recent.Add(key, value)
+	}
+
+	return value, false
 }
 
 // ensureSpace is used to ensure we have space in the cache

@@ -1,1 +1,1 @@
-module github.com/hashicorp/golang-lru
+module github.com/opencoff/golang-lru
