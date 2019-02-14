@@ -144,7 +144,7 @@ func (c *TwoQueueCache) Add(key, value interface{}) {
 // Probe adds 'val' if the key is NOT found in the cache and returns it.
 // If key is in the cache, the corresponding value is returned.
 // 'ok' is true is found in the cache and false otherwise.
-func (c *TwoQueueCache) Probe(key, ctor func(key interface{}) interface {}) (interface{}, bool) {
+func (c *TwoQueueCache) Probe(key interface{}, ctor func(key interface{}) interface{}) (interface{}, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

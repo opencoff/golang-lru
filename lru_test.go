@@ -6,7 +6,7 @@ import (
 )
 
 func BenchmarkLRU_Rand(b *testing.B) {
-	l, err := New(8192)
+	l, err := NewSimple(8192)
 	if err != nil {
 		b.Fatalf("err: %v", err)
 	}
@@ -35,7 +35,7 @@ func BenchmarkLRU_Rand(b *testing.B) {
 }
 
 func BenchmarkLRU_Freq(b *testing.B) {
-	l, err := New(8192)
+	l, err := NewSimple(8192)
 	if err != nil {
 		b.Fatalf("err: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestLRU(t *testing.T) {
 		}
 		evictCounter++
 	}
-	l, err := NewWithEvict(128, onEvicted)
+	l, err := NewSimpleWithEvict(128, onEvicted)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -139,22 +139,25 @@ func TestLRUAdd(t *testing.T) {
 		evictCounter++
 	}
 
-	l, err := NewWithEvict(1, onEvicted)
+	l, err := NewSimpleWithEvict(1, onEvicted)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
 
-	if l.Add(1, 1) == true || evictCounter != 0 {
+	l.Add(1, 1)
+	if evictCounter != 0 {
 		t.Errorf("should not have an eviction")
 	}
-	if l.Add(2, 2) == false || evictCounter != 1 {
+
+	l.Add(2, 2)
+	if evictCounter != 1 {
 		t.Errorf("should have an eviction")
 	}
 }
 
 // test that Contains doesn't update recent-ness
 func TestLRUContains(t *testing.T) {
-	l, err := New(2)
+	l, err := NewSimple(2)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -173,7 +176,7 @@ func TestLRUContains(t *testing.T) {
 
 // test that Contains doesn't update recent-ness
 func TestLRUContainsOrAdd(t *testing.T) {
-	l, err := New(2)
+	l, err := NewSimple(2)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -203,7 +206,7 @@ func TestLRUContainsOrAdd(t *testing.T) {
 
 // test that Peek doesn't update recent-ness
 func TestLRUPeek(t *testing.T) {
-	l, err := New(2)
+	l, err := NewSimple(2)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
