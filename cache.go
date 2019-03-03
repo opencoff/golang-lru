@@ -9,23 +9,28 @@ type Cache interface {
 	// Add adds a value to the cache.
 	Add(key, val interface{})
 
-	// Get looks up a key's value from the cache.
+	// Get returns (value, true) if key is in the cache and
+	// (nil, false) otherwise. If key is found in the cache, depending
+	// on the implementation, the cache may update the frequency or recency
+	// of the key.
 	Get(key interface{}) (value interface{}, ok bool)
 
-	// Probe adds 'val' if the key is NOT found in the cache and returns it.
-	// If key is in the cache, the corresponding value is returned.
-	// 'ok' is true is found in the cache and false otherwise.
+	// Probe returns (value, true) if key is already in the cache.
+	// Otherwise, it constructs the new value by calling ctor(key), and
+	// inserts the new value into the cache; finally it returns the
+	// newly constructed value and false (value, false).
 	Probe(key interface{}, ctor func(key interface{}) interface{}) (value interface{}, ok bool)
 
-	// Peek is used to inspect the cache value of a key
-	// without updating recency or frequency.
+	// Peek is similar to Get() except, it doesn't update the
+	// recency or frequency.
 	Peek(key interface{}) (value interface{}, ok bool)
 
-	// Remove removes the provided key from the cache.
+	// Remove removes key from the cache if it exists.
 	Remove(key interface{})
 
-	// Contains is used to check if the cache contains a key
-	// without updating recency or frequency.
+	// Contains returns true if the key is found in the cache and
+	// false otherwise. It does this operation without updating recency
+	// or frequency.
 	Contains(key interface{}) bool
 
 	// Len returns the number of items in the cache.
